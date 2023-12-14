@@ -97,6 +97,7 @@ fn parse_es_event(
                     EsActionType::Auth => EsEvent::AuthExec(event),
                 }
             }
+            SupportedEsEvent::NotifyExit => EsEvent::NotifyExit(event.exit.stat),
             SupportedEsEvent::AuthOpen | SupportedEsEvent::NotifyOpen => {
                 let file = event.open;
                 let event = EsEventOpen {
