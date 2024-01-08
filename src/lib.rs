@@ -2,8 +2,8 @@
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
-
-include!("./eps_bindings.rs");
+#![allow(clippy::all)]
+include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
 mod parsers;
 
@@ -497,9 +497,8 @@ fn es_notify_callback(
         Ok(x) => x,
     };
 
-    match tx.send(message) {
-        Err(e) => println!("Error logging event: {}", e),
-        _ => (),
+    if let Err(e) = tx.send(message) {
+        println!("Error logging event: {}", e);
     }
 }
 
@@ -514,7 +513,7 @@ pub fn create_es_client(tx: Sender<EsMessage>) -> Result<EsClient, EsClientError
     )
     .copy();
 
-    match unsafe { es_new_client(client_ptr, &*handler as *const Block<_, _> as *const std::ffi::c_void) } {
+    match unsafe { es_new_client(client_ptr, &*handler as *const Block<_, _> as *mut std::ffi::c_void) } {
         ES_NEW_CLIENT_SUCCESS => {
             let hidden = EsClientHidden {
                 client: client,
@@ -604,16 +603,14 @@ impl EsClient {
             .iter()
             .filter(|x| !client.active_subscriptions.contains(x))
             .collect();
-        if events.len() == 0 {
+        if events.is_empty() {
             debug!(target: "endpointsecurity-rs", "No new events being subscribed to");
             return true;
         }
 
         let mut c_events: [u32; 128] = [0; 128];
-        let mut i = 0;
-        for event in &events {
-            c_events[i] = supportedesevent_to_raw_event(&*event);
-            i += 1;
+        for (i, event) in events.iter().enumerate() {
+            c_events[i] = supportedesevent_to_raw_event(event);
         }
 
         unsafe {
@@ -646,16 +643,14 @@ impl EsClient {
             .iter()
             .filter(|x| client.active_subscriptions.contains(x))
             .collect();
-        if events.len() == 0 {
+        if events.is_empty() {
             debug!(target: "endpointsecurity-rs", "Not subscribed to any events request to unsubscribe from");
             return true;
         }
 
         let mut c_events: [u32; 128] = [0; 128];
-        let mut i = 0;
-        for event in &events {
-            c_events[i] = supportedesevent_to_raw_event(&*event);
-            i += 1;
+        for (i, event) in events.iter().enumerate() {
+            c_events[i] = supportedesevent_to_raw_event(event);
         }
 
         unsafe {
@@ -743,6 +738,19 @@ impl EsClient {
             ES_RESPONSE_RESULT_ERROR_EVENT_TYPE => EsRespondResult::ErrorEventType,
             _ => EsRespondResult::UnknownResponse,
         }
+    }
+
+    pub fn mute_process(&self, token: &audit_token_t) -> bool {
+        unsafe {
+            let client = (*self.client).lock();
+            let client = match client {
+                Ok(c) => c,
+                Err(_) => return false,
+            };
+            es_mute_process(client.client, token);
+        }
+
+        true
     }
 
     pub fn respond_to_auth_event(

@@ -82,7 +82,7 @@ fn parse_es_event(
                 while x < argc {
                     argv.push(parse_es_string_token(es_exec_arg(
                         &event.exec as *const _,
-                        x as u32,
+                        x,
                     )));
                     x += 1;
                 }
@@ -253,7 +253,7 @@ fn parse_es_process(process: &es_process_t) -> EsProcess {
         pid: unsafe { audit_token_to_pid(process.audit_token) as u32 },
         group_id: process.group_id as u32,
         session_id: process.session_id as u32,
-        codesigning_flags: process.codesigning_flags as u32,
+        codesigning_flags: process.codesigning_flags,
         is_platform_binary: process.is_platform_binary,
         is_es_client: process.is_es_client,
         cdhash: {
@@ -274,7 +274,7 @@ fn parse_es_process(process: &es_process_t) -> EsProcess {
 /// and parse it into a safe Rust structure.
 fn parse_es_string_token(string_token: es_string_token_t) -> String {
     match string_token.length {
-        x if x <= 0 => String::new(),
+        x if x == 0 => String::new(),
         _ => match unsafe { CStr::from_ptr(string_token.data).to_str() } {
             Ok(v) => v.to_owned(),
             Err(e) => {
