@@ -17,7 +17,7 @@ use std::fmt;
 use std::sync::{Arc, Mutex};
 
 use serde::{Deserialize, Serialize};
-
+ 
 use parsers::*;
 
 use block::*;
@@ -741,14 +741,12 @@ impl EsClient {
     }
 
     pub fn mute_process(&self, token: &audit_token_t) -> bool {
-        unsafe {
-            let client = (*self.client).lock();
-            let client = match client {
-                Ok(c) => c,
-                Err(_) => return false,
-            };
-            es_mute_process(client.client, token);
-        }
+        let client = (*self.client).lock();
+        let client = match client {
+            Ok(c) => c,
+            Err(_) => return false,
+        };
+        unsafe{es_mute_process(client.client, token as *const audit_token_t)};
 
         true
     }
