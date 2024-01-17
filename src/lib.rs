@@ -491,14 +491,14 @@ fn es_notify_callback(
 ) {
     let message = match parse_es_message(message) {
         Err(e) => {
-            println!("Could not parse message: {}", e);
+            error!("Could not parse message: {}", e);
             return;
         }
         Ok(x) => x,
     };
 
     if let Err(e) = tx.send(message) {
-        println!("Error logging event: {}", e);
+        error!("Error logging event: {}", e);
     }
 }
 
@@ -589,7 +589,7 @@ impl EsClient {
     // Start receiving callbacks for specified events
     pub fn subscribe_to_events(&self, events: &Vec<SupportedEsEvent>) -> bool {
         if events.len() > 128 {
-            println!("Too many events to subscribe to!");
+            error!("Too many events to subscribe to!");
             return false;
         }
 
@@ -629,7 +629,7 @@ impl EsClient {
     // Unsubscribe from events and stop receiving callbacks for them
     pub fn unsubscribe_to_events(&self, events: &Vec<SupportedEsEvent>) -> bool {
         if events.len() > 128 {
-            println!("Too many events to unsubscribe to!");
+            error!("Too many events to unsubscribe to!");
             return false;
         }
 
@@ -669,7 +669,7 @@ impl EsClient {
     // Set your subscriptions to these regardless of what they were before
     pub fn set_subscriptions_to(&self, events: &Vec<SupportedEsEvent>) -> bool {
         if events.len() > 128 {
-            println!("Too many events to unsubscribe to!");
+            error!("Too many events to unsubscribe to!");
             return false;
         }
         let new_subscriptions: Vec<SupportedEsEvent>;
@@ -741,16 +741,13 @@ impl EsClient {
     }
 
     pub fn mute_process(&self, token: &audit_token_t) -> bool {
-        unsafe {
-            let client = (*self.client).lock();
-            let client = match client {
-                Ok(c) => c,
-                Err(_) => return false,
-            };
-            es_mute_process(client.client, token);
-        }
+        let client = (*self.client).lock();
+        let client = match client {
+            Ok(c) => c,
+            Err(_) => return false,
+        };
 
-        true
+        0 == unsafe { es_mute_process(client.client, token as *const audit_token_t) }
     }
 
     pub fn respond_to_auth_event(
