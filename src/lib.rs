@@ -747,7 +747,7 @@ impl EsClient {
             Err(_) => return false,
         };
 
-        0 == unsafe { es_mute_process(client.client, token) }
+        es_return_t_ES_RETURN_SUCCESS == unsafe { es_mute_process(client.client, token) }
     }
 
     pub fn respond_to_auth_event(
