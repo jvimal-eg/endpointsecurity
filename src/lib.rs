@@ -741,16 +741,13 @@ impl EsClient {
     }
 
     pub fn mute_process(&self, token: &audit_token_t) -> bool {
-        unsafe {
-            let client = (*self.client).lock();
-            let client = match client {
-                Ok(c) => c,
-                Err(_) => return false,
-            };
-            es_mute_process(client.client, token);
-        }
+        let client = (*self.client).lock();
+        let client = match client {
+            Ok(c) => c,
+            Err(_) => return false,
+        };
 
-        true
+        es_return_t_ES_RETURN_SUCCESS == unsafe { es_mute_process(client.client, token) }
     }
 
     pub fn respond_to_auth_event(
