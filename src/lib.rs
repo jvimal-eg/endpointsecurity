@@ -727,7 +727,7 @@ impl EsClient {
             Err(_) => return EsRespondResult::UnknownResponse, // TODO Fix this
         };
 
-        match unsafe {
+        let ret = match unsafe {
             es_respond_flags_result(client.client, message.raw_message, authorized_flags, cache)
         } {
             ES_RESPOND_RESULT_SUCCESS => EsRespondResult::Sucess,
@@ -737,7 +737,13 @@ impl EsClient {
             ES_RESPOND_RESULT_ERROR_DUPLICATE_RESPONSE => EsRespondResult::ErrorDuplicateResponse,
             ES_RESPONSE_RESULT_ERROR_EVENT_TYPE => EsRespondResult::ErrorEventType,
             _ => EsRespondResult::UnknownResponse,
-        }
+        };
+
+        unsafe {
+            es_release_message(message.raw_message);
+        };
+
+        ret
     }
 
     pub fn mute_process(&self, token: &audit_token_t) -> bool {
@@ -772,8 +778,9 @@ impl EsClient {
             Err(_) => return EsRespondResult::UnknownResponse, // TODO Fix this
         };
 
-        match unsafe { es_respond_auth_result(client.client, message.raw_message, response, cache) }
-        {
+        let ret = match unsafe {
+            es_respond_auth_result(client.client, message.raw_message, response, cache)
+        } {
             ES_RESPOND_RESULT_SUCCESS => EsRespondResult::Sucess,
             ES_RESPONSE_RESULT_ERROR_INVALID_ARGUMENT => EsRespondResult::ErrorInvalidArgument,
             ES_RESPOND_RESULT_ERROR_INTERNAL => EsRespondResult::ErrorInternal,
@@ -781,13 +788,23 @@ impl EsClient {
             ES_RESPOND_RESULT_ERROR_DUPLICATE_RESPONSE => EsRespondResult::ErrorDuplicateResponse,
             ES_RESPONSE_RESULT_ERROR_EVENT_TYPE => EsRespondResult::ErrorEventType,
             _ => EsRespondResult::UnknownResponse,
-        }
+        };
+
+        unsafe {
+            es_release_message(message.raw_message);
+        };
+
+        ret
     }
 }
 
 impl Drop for EsClient {
     fn drop(&mut self) {
         unsafe {
+            if Arc::strong_count(&self.client) > 1 {
+                return;
+            }
+
             let client = (*self.client).lock();
             let mut client = match client {
                 Ok(c) => c,
