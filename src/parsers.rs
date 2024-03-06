@@ -2,7 +2,7 @@ use crate::{
     audit_token_t, es_action_type_t_ES_ACTION_TYPE_AUTH as ES_ACTION_TYPE_AUTH,
     es_action_type_t_ES_ACTION_TYPE_NOTIFY as ES_ACTION_TYPE_NOTIFY, es_events_t, es_exec_arg,
     es_exec_arg_count, es_file_t, es_message_t, es_message_t__bindgen_ty_1, es_process_t,
-    es_string_token_t, pid_t,
+    es_release_message, es_string_token_t, pid_t,
 };
 use std::ffi::CStr;
 
@@ -219,11 +219,20 @@ pub fn parse_es_message(message: *mut es_message_t) -> Result<EsMessage, &'stati
         ES_ACTION_TYPE_NOTIFY => EsActionType::Notify,
         _ => return Err("Couldn't parse action_type"), // At time of writing these are the only two ways
     };
+    if matches!(action_type, EsActionType::Auth) {
+        // Make a copy since auth messages might be processed async.
+        unsafe {
+            crate::es_retain_message(message as *const es_message_t);
+        }
+    }
 
     let event = if let Some(event) = raw_event_to_supportedesevent(message.event_type as u64) {
         parse_es_event(event, message.event, &action_type)
     } else {
         error!("Error in this event type: {}", message.event_type as u64);
+        unsafe {
+            es_release_message(message as *const es_message_t);
+        }
         return Err("Could not parse this event type");
     };
 
@@ -236,7 +245,12 @@ pub fn parse_es_message(message: *mut es_message_t) -> Result<EsMessage, &'stati
         seq_num: message.seq_num,
         action: match parse_es_action(message.action, &action_type) {
             Some(x) => x,
-            None => return Err("Couldn't parse the action field"),
+            None => {
+                unsafe {
+                    es_release_message(message as *const es_message_t);
+                }
+                return Err("Couldn't parse the action field");
+            }
         },
         action_type: action_type,
         event: event,
